@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler local state and build output
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Local environment and integration credentials
+.env
+.env.*
+!.env.example
+.integration.vars
+.integration.vars.*
+!.integration.vars.example
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local editor settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

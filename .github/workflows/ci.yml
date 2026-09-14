@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+      - run: npm run build:check
+      - name: Reject committed secrets
+        shell: bash
+        run: |
+          if grep -RInE --exclude-dir=node_modules --exclude-dir=.git '(hf_[A-Za-z0-9]{20,}|APP_PASSWORD[[:space:]]*=[[:space:]]*[^r])' .; then
+            echo 'Potential secret detected.'
+            exit 1
+          fi

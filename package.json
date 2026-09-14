@@ -1,0 +1,33 @@
+{
+  "name": "cloudflare-hf-netdisk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "HuggingFace Hub 网盘 - Cloudflare Workers 版",
+  "scripts": {
+    "dev": "wrangler dev --ip 0.0.0.0 --port 8787",
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev --ip 0.0.0.0 --port 8787",
+    "test": "vitest run",
+    "lint": "eslint . --max-warnings 0",
+    "e2e": "playwright test",
+    "build:check": "wrangler deploy --dry-run",
+    "integration": "node scripts/integration.mjs",
+    "integration:lfs": "node scripts/lfs-integration.mjs",
+    "performance": "node scripts/performance.mjs",
+    "health": "node scripts/healthcheck.mjs",
+    "trash:status": "node scripts/trash-status.mjs",
+    "recent:status": "node scripts/recent-status.mjs",
+    "check": "npm run lint && npm run test && npm run e2e && npm run build:check"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.24.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260828.1": true
+  }
+}

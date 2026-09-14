@@ -1,0 +1,55 @@
+name = "cloudflare-hf-netdisk"
+main = "src/index.js"
+compatibility_date = "2024-08-21"
+compatibility_flags = ["global_fetch_strictly_public"]
+# 配置自定义域名路由
+routes = [
+  { pattern = "hf.relc.eu.org/*", zone_name = "relc.eu.org" }
+]
+
+[assets]
+directory = "frontend"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[observability]
+enabled = true
+head_sampling_rate = 0.1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 0.1
+invocation_logs = true
+persist = true
+
+[vars]
+# 默认 HuggingFace Token（可选，客户端也可在请求头中传递）
+# Configure HF_TOKEN and APP_PASSWORD with `wrangler secret put`.
+HF_REPO = "binmt/repo-data"
+HF_PRIVATE = "false"
+HF_MIRROR_URL = "https://hf-mirror.com/"
+HF_MIRROR_ALLOWED_HOSTS = "hf-mirror.com"
+MAX_UPLOAD_PARTS = "10000"
+[[durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionStore"
+
+[[durable_objects.bindings]]
+name = "UPLOADS"
+class_name = "UploadSession"
+
+[[durable_objects.bindings]]
+name = "SHARES"
+class_name = "ShareStore"
+
+[exports.SessionStore]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.UploadSession]
+type = "durable-object"
+storage = "sqlite"
+
+[exports.ShareStore]
+type = "durable-object"
+storage = "sqlite"

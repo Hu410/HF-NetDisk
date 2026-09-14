@@ -1,0 +1,210 @@
+openapi: 3.1.0
+info:
+  title: HF NetDisk API
+  version: 1.0.0
+  description: Same-origin personal netdisk API backed by one fixed Hugging Face repository.
+servers:
+  - url: /
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: hf_session
+  schemas:
+    Error:
+      type: object
+      required: [success, error, code, requestId]
+      properties:
+        success: { const: false }
+        error: { type: string }
+        code: { type: string }
+        requestId: { type: string, format: uuid }
+paths:
+  /api/auth/status:
+    get:
+      summary: Get session status
+      responses:
+        '200': { description: Session status }
+  /api/auth/login:
+    post:
+      summary: Create an HttpOnly session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, format: password }
+                remember: { type: boolean, default: false }
+      responses:
+        '200': { description: Logged in; sets the session cookie }
+        '401': { description: Invalid credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/auth/logout:
+    post:
+      summary: Revoke the current session
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Logged out }
+  /api/repo/info:
+    get:
+      summary: Get fixed repository information
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: summary, in: query, schema: { type: boolean, default: false }, description: Omit the repository siblings list for the compact WebUI response }
+      responses:
+        '200': { description: Repository information }
+  /api/directory/list:
+    get:
+      summary: List one repository page
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: dir, in: query, schema: { type: string } }
+        - { name: recursive, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+        - { name: cursor, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Files and an optional nextCursor }
+  /api/files/upload:
+    put:
+      summary: Upload a regular file
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                filePath: { type: string }
+                conflictPolicy: { enum: [reject, overwrite, rename] }
+      responses:
+        '200': { description: File committed }
+        '409': { description: Path conflict, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/files/getUploadUrl:
+    post:
+      summary: Create a server-bound LFS upload session
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Upload ID and part plan; never contains the upstream target URL }
+  /api/files/lfsUpload:
+    put:
+      summary: Stream one binary LFS part through the Worker
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: uploadId, in: query, required: true, schema: { type: string } }
+        - { name: partNumber, in: query, schema: { type: integer, minimum: 0 } }
+      responses:
+        '200': { description: Part accepted }
+  /api/files/completeMultipart:
+    post:
+      summary: Complete an LFS multipart upload
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Multipart upload completed }
+  /api/files/commit:
+    post:
+      summary: Commit an uploaded LFS object to the repository
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: File committed }
+  /api/files/rename:
+    post:
+      summary: Atomically move or rename a file
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: File moved }
+  /api/files/{path}:
+    parameters:
+      - { name: path, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Download a file; private content is streamed by the Worker
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: File stream }
+        '206': { description: Partial file stream }
+    delete:
+      summary: Move a file to trash
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: File moved to trash }
+  /api/trash/list:
+    get:
+      summary: List trash entries
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        '200': { description: Trash entries }
+  /api/trash/restore:
+    post:
+      summary: Restore a trash entry
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Restored }
+  /api/trash/purge:
+    post:
+      summary: Permanently purge a trash entry
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200': { description: Purged }
+  /api/shares:
+    get:
+      summary: List managed file and folder shares
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 }, description: Fixed-size page of 20 shares }
+      responses:
+        '200': { description: Up to 20 share records without password hashes, plus pagination metadata }
+    post:
+      summary: Create a file or folder share
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path, type]
+              properties:
+                path: { type: string }
+                type: { enum: [file, directory] }
+                expiresIn: { type: [integer, 'null'], minimum: 300, maximum: 31536000 }
+                password: { type: string, maxLength: 128 }
+      responses:
+        '201': { description: Share created }
+  /api/shares/{id}:
+    delete:
+      summary: Revoke a share immediately
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-f0-9]{32}$' } }
+      responses:
+        '200': { description: Share revoked }
+  /api/public/shares/{id}:
+    get:
+      summary: Read public share metadata or its locked state
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Public share metadata }
+        '410': { description: Share expired }
+  /api/public/shares/{id}/access:
+    post:
+      summary: Unlock a password-protected share
+      responses:
+        '200': { description: Access granted with an independent HttpOnly cookie }
+        '401': { description: Incorrect password }
+        '429': { description: Too many password attempts }
+  /api/public/shares/{id}/download:
+    get:
+      summary: Download a shared file or a file inside a shared folder
+      parameters:
+        - { name: file, in: query, schema: { type: string }, description: Relative file path for folder shares }
+      responses:
+        '200': { description: File stream }
+        '206': { description: Partial file stream }
