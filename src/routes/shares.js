@@ -1,9 +1,8 @@
 import { HuggingFaceAPI } from '../huggingfaceAPI.js';
 import { withAuth } from '../middleware/auth.js';
 import { contentDisposition, errorResponse, fileResponse, jsonResponse, successResponse } from '../utils/response.js';
-import { sanitizePath } from '../utils/helpers.js';
+import { randomAlphanumeric, sanitizePath } from '../utils/helpers.js';
 import { createPasswordDigest } from '../utils/shareCrypto.js';
-import { randomHex } from '../utils/helpers.js';
 import { shareStoreRequest } from '../utils/shareStore.js';
 
 const MAX_FOLDER_FILES = 1000;
@@ -17,12 +16,12 @@ async function handleManagedShares(context) {
     const response=await shareStoreRequest(context.env,'/share/list',{ page,limit:20 });
     const data=await response.json();
     return successResponse({
-      shares:data.shares.map(share=>({ ...share,url:`${url.origin}/share.html?id=${share.id}` })),
+      shares:data.shares.map(share=>({ ...share,url:`${url.origin}/s/${share.id}` })),
       pagination:data.pagination,
     });
   }
   if(url.pathname==='/api/shares' && request.method==='POST') return createShare(context);
-  const match=url.pathname.match(/^\/api\/shares\/([a-f0-9]{32})$/);
+  const match=url.pathname.match(/^\/api\/shares\/([A-Za-z0-9]{8}|[a-f0-9]{32})$/);
   if(match && request.method==='DELETE'){
     const response=await shareStoreRequest(context.env,'/share/delete',{ id:match[1] });
     if(!response.ok) return errorResponse('Share not found',404,null,'SHARE_NOT_FOUND');
@@ -46,22 +45,24 @@ async function createShare(context) {
   if(!await pathExists(api,path,type)) return errorResponse('File or folder not found',404,null,'PATH_NOT_FOUND');
   const createdAt=new Date().toISOString();
   const digest=await createPasswordDigest(password);
-  const record={
-    id:randomHex(16),path,name:path.split('/').pop(),type,createdAt,
-    expiresAt:expiresIn===null?null:new Date(Date.now()+expiresIn*1000).toISOString(),
-    ...digest,
-  };
-  const response=await shareStoreRequest(context.env,'/share/create',record);
-  if(!response.ok) return errorResponse('Share limit reached',409,null,'SHARE_LIMIT');
-  const { share }=await response.json();
+  const record={ path,name:path.split('/').pop(),type,createdAt,
+    expiresAt:expiresIn===null?null:new Date(Date.now()+expiresIn*1000).toISOString(),...digest };
+  let share=null;
+  for(let attempt=0;attempt<5;attempt++){
+    const response=await shareStoreRequest(context.env,'/share/create',{ ...record,id:randomAlphanumeric(8) });
+    const data=await response.json().catch(()=>({}));
+    if(response.ok){ share=data.share; break; }
+    if(data.code!=='SHARE_ID_COLLISION') return errorResponse('Share limit reached',409,null,'SHARE_LIMIT');
+  }
+  if(!share) return errorResponse('Unable to create a unique share link',503,null,'SHARE_ID_UNAVAILABLE');
   const origin=new URL(context.request.url).origin;
-  return jsonResponse({ success:true,message:'Share created',share:{ ...share,url:`${origin}/share.html?id=${share.id}` } },201);
+  return jsonResponse({ success:true,message:'Share created',share:{ ...share,url:`${origin}/s/${share.id}` } },201);
 }
 
 async function handlePublicShares(context) {
   const { request }=context;
   const url=new URL(request.url);
-  const match=url.pathname.match(/^\/api\/public\/shares\/([a-f0-9]{32})(?:\/(access|download))?$/);
+  const match=url.pathname.match(/^\/api\/public\/shares\/([A-Za-z0-9]{8}|[a-f0-9]{32})(?:\/(access|download))?$/);
   if(!match) return errorResponse('Share not found',404,null,'SHARE_NOT_FOUND');
   const id=match[1], action=match[2]||'info';
   if(action==='access' && request.method==='POST') return unlockShare(context,id);

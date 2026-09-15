@@ -90,11 +90,33 @@ async function handleGetRepoInfo(context) {
     return errorResponse('Failed to get repo info', 500);
   }
 
-  // 提取关键信息
-  // HF API 返回 size: { size_in_bytes, nb_files }（snake_case），兼容两种格式
+  // HF 仓库信息的实际占用量位于顶层 usedStorage，同时兼容旧格式。
   const rawSize = info.size || {};
-  const sizeInBytes = rawSize.sizeInBytes || rawSize.size_in_bytes || 0;
+  let sizeInBytes = firstNonNegativeNumber(
+    info.usedStorage,
+    info.used_storage,
+    info.mainSize,
+    info.main_size,
+    rawSize.sizeInBytes,
+    rawSize.size_in_bytes,
+  );
   const nbFiles = rawSize.nbFiles || rawSize.nb_files || (info.siblings ? info.siblings.length : 0);
+
+  // 部分仓库信息响应不包含容量字段，此时按主分支文件大小回退统计。
+  if (sizeInBytes === null) {
+    try {
+      const tree = await api.listDirectoryAllPages('', true, {
+        serverRecursive: true,
+        expand: true,
+      });
+      sizeInBytes = tree.files.reduce((total, file) => (
+        total + (firstNonNegativeNumber(file.size, file.lfs?.size) || 0)
+      ), 0);
+    } catch (error) {
+      console.warn('Failed to calculate repository storage:', error.message);
+      sizeInBytes = 0;
+    }
+  }
 
   const summary = {
     id: info.id,
@@ -121,6 +143,15 @@ async function handleGetRepoInfo(context) {
   }
 
   return successResponse({ info: summary });
+}
+
+function firstNonNegativeNumber(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const number = Number(value);
+    if (Number.isFinite(number) && number >= 0) return number;
+  }
+  return null;
 }
 
 /**

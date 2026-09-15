@@ -21,6 +21,22 @@ export function randomHex(byteLength) {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+export function randomAlphanumeric(length) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const limit = 256 - (256 % alphabet.length);
+  let result = '';
+  while (result.length < length) {
+    const bytes = new Uint8Array(Math.ceil((length - result.length) * 1.1));
+    crypto.getRandomValues(bytes);
+    for (const byte of bytes) {
+      if (byte >= limit) continue;
+      result += alphabet[byte % alphabet.length];
+      if (result.length === length) break;
+    }
+  }
+  return result;
+}
+
 export async function sha256HexString(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');

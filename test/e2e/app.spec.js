@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 /* global document, window */
 
 async function mockApi(page, authenticated = true, trashEntries = [], browseDirectories = false, recentTotalPages = 1) {
-  const shareId = 'a'.repeat(32);
+  const shareId = 'aB3dE5g7';
   let shares = [];
   let publicUnlocked = false;
   await page.route('**/api/**', async route => {
@@ -42,7 +42,7 @@ async function mockApi(page, authenticated = true, trashEntries = [], browseDire
       body.pagination = { page:trashPage,limit:20,totalEntries:trashEntries.length,totalPages:Math.max(1,Math.ceil(trashEntries.length/20)) };
     } else if (url.pathname === '/api/shares' && method === 'POST') {
       const input=route.request().postDataJSON();
-      const share={ id:shareId,path:input.path,name:'alpha.txt',type:input.type,createdAt:'2026-08-30T00:00:00Z',expiresAt:'2026-09-06T00:00:00Z',passwordProtected:Boolean(input.password),expired:false,url:`${url.origin}/share.html?id=${shareId}` };
+      const share={ id:shareId,path:input.path,name:'alpha.txt',type:input.type,createdAt:'2026-08-30T00:00:00Z',expiresAt:'2026-09-06T00:00:00Z',passwordProtected:Boolean(input.password),expired:false,url:`${url.origin}/s/${shareId}` };
       shares=[share]; body.share=share;
     } else if (url.pathname === '/api/shares' && method === 'GET') {
       body.shares=shares;
@@ -97,6 +97,9 @@ test('each navigation feature has a stable URL and supports browser history', as
   await page.goBack();
   await expect(page).toHaveURL(url => url.pathname === '/settings');
   await expect(page.locator('#p-settings')).toHaveClass(/active/);
+  await expect(page.locator('#nav-sidebar')).toBeVisible();
+  await expect(page.locator('#settings-body .settings-storage')).toBeHidden();
+  await expect(page.locator('#settings-body .settings-group.mobile-settings-nav')).toBeHidden();
 });
 
 test('direct feature URLs restore their page without first loading the file view', async ({ page }) => {
@@ -196,6 +199,53 @@ test('repository status and dashboard reuse one repository-info request', async 
   await page.locator('[data-action="test-connection"]').click();
   await expect(page.locator('#toast-container .toast.success')).toBeVisible();
   expect(repoRequests).toBe(1);
+});
+
+test('sidebar storage percentage follows public and private repository quotas', async ({ page }) => {
+  await mockApi(page, true);
+  let repository = { id:'owner/repo',private:true,size:{nbFiles:1,sizeInBytes:25 * 1024 ** 3},downloads:0,likes:0 };
+  await page.route('**/api/repo/info*', route => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify({ success:true,info:repository }),
+  }));
+
+  await page.goto('/');
+  await expect(page.locator('#storage-percent')).toHaveText('25.00%');
+  await expect(page.locator('#storage-usage')).toHaveText('25.0 GB / 100.0 GB');
+  await expect(page.locator('#storage-plan')).toHaveText('私有仓库');
+  await expect(page.locator('#storage-track')).toHaveAttribute('aria-valuenow','25.00');
+
+  repository = { ...repository,private:false,size:{nbFiles:1,sizeInBytes:2 * 1024 ** 4} };
+  await page.reload();
+  await expect(page.locator('#storage-percent')).toHaveText('25.00%');
+  await expect(page.locator('#storage-usage')).toHaveText('2.0 TB / 8.0 TB');
+  await expect(page.locator('#storage-plan')).toHaveText('公开仓库');
+  await expect(page.locator('#storage-track')).toHaveAttribute('aria-valuenow','25.00');
+});
+
+test('mobile settings shows repository storage below the profile card', async ({ page }) => {
+  await page.setViewportSize({ width:390, height:844 });
+  await mockApi(page, true);
+  await page.route('**/api/repo/info*', route => route.fulfill({
+    status:200,
+    contentType:'application/json',
+    body:JSON.stringify({
+      success:true,
+      info:{ id:'owner/repo',private:true,size:{nbFiles:1,sizeInBytes:25 * 1024 ** 3} },
+    }),
+  }));
+
+  await page.goto('/settings');
+  const storage = page.locator('#settings-body .settings-storage');
+  await expect(storage).toBeVisible();
+  await expect(storage.locator('#mobile-storage-percent')).toHaveText('25.00%');
+  await expect(storage.locator('#mobile-storage-usage')).toHaveText('25.0 GB / 100.0 GB');
+  await expect(storage.locator('#mobile-storage-plan')).toHaveText('私有仓库');
+  await expect(storage.locator('#mobile-storage-track')).toHaveAttribute('aria-valuenow','25.00');
+  const profileBottom = await page.locator('#settings-body .settings-profile').evaluate(element => element.getBoundingClientRect().bottom);
+  const storageTop = await storage.evaluate(element => element.getBoundingClientRect().top);
+  expect(storageTop).toBeGreaterThanOrEqual(profileBottom);
 });
 
 test('file details render known list metadata before the metadata request completes', async ({ page }) => {
@@ -326,6 +376,29 @@ test('upload navigation carries the current nested directory into the destinatio
   await expect(page.locator('#upload-dir-input')).toHaveValue('项目资料/二级目录');
 });
 
+test('upload composer stays compact on desktop and mobile', async ({ page }) => {
+  await mockApi(page, true);
+  await page.goto('/upload');
+  const uploadZone = page.locator('#upload-zone');
+  const uploadCard = page.locator('#p-upload .upload-card');
+  expect(Math.round((await uploadZone.boundingBox()).height)).toBeLessThanOrEqual(180);
+  expect(Math.round((await uploadCard.boundingBox()).height)).toBeLessThanOrEqual(340);
+
+  await page.setViewportSize({ width:390, height:844 });
+  expect(Math.round((await uploadZone.boundingBox()).height)).toBeLessThanOrEqual(152);
+  expect(Math.round((await uploadCard.boundingBox()).height)).toBeLessThanOrEqual(320);
+  await expect(page.locator('#p-upload .upload-capabilities')).toBeHidden();
+
+  await page.locator('#file-input').setInputFiles({
+    name:'compact-upload.txt',
+    mimeType:'text/plain',
+    buffer:Buffer.from('compact'),
+  });
+  const transfer = page.locator('#upload-progress-area');
+  await expect(transfer).toBeVisible();
+  expect((await transfer.boundingBox()).y).toBeLessThan(700);
+});
+
 test('upload picker renders a detailed transfer list and supports removing completed files', async ({ page }) => {
   await mockApi(page, true);
   await page.goto('/upload');
@@ -436,7 +509,7 @@ test('file details show the repository modification time from the file list', as
 
 test('managed shares render fixed pages of 20',async({page})=>{
   const shares=Array.from({length:25},(_,index)=>({
-    id:index.toString(16).padStart(32,'0'),path:`shared-${index}.txt`,name:`shared-${index}.txt`,type:'file',
+    id:index.toString(36).padStart(8,'0'),path:`shared-${index}.txt`,name:`shared-${index}.txt`,type:'file',
     createdAt:new Date(Date.UTC(2026,0,25-index)).toISOString(),expiresAt:null,passwordProtected:false,expired:false,
   }));
   await mockApi(page,true);
@@ -445,7 +518,7 @@ test('managed shares render fixed pages of 20',async({page})=>{
     const url=new URL(route.request().url());
     const currentPage=Number(url.searchParams.get('page')||1);
     const start=(currentPage-1)*20;
-    const pageShares=shares.slice(start,start+20).map(share=>({...share,url:`${url.origin}/share.html?id=${share.id}`}));
+    const pageShares=shares.slice(start,start+20).map(share=>({...share,url:`${url.origin}/s/${share.id}`}));
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
       success:true,shares:pageShares,pagination:{page:currentPage,limit:20,totalShares:shares.length,totalPages:2},
     })});
@@ -471,7 +544,7 @@ test('owner can create, manage and revoke a password-protected share', async ({ 
   await page.locator('#share-password').fill('visitor-password');
   await page.locator('#confirm-create-share').click();
   await expect(page.locator('#modal-title')).toHaveText('分享创建成功');
-  await expect(page.locator('#created-share-url')).toHaveValue(/share\.html\?id=/);
+  await expect(page.locator('#created-share-url')).toHaveValue(/^http:\/\/127\.0\.0\.1:8788\/s\/[A-Za-z0-9]{8}$/);
   await page.locator('#modal-footer button').click();
   await page.locator('[data-page="shares"]').click();
   await expect(page.locator('#shares-body .share-card')).toContainText('alpha.txt');
@@ -486,7 +559,7 @@ test('owner can create, manage and revoke a password-protected share', async ({ 
 
 test('visitor unlocks a protected public share and sees the download action', async ({ page }) => {
   await mockApi(page, true);
-  await page.goto(`/share.html?id=${'a'.repeat(32)}`);
+  await page.goto('/s/aB3dE5g7');
   await expect(page.locator('.share-public-brand')).toContainText('HF Drive');
   await expect(page.locator('.share-header-badge')).toContainText('安全分享');
   await expect(page.locator('#share-content')).toContainText('此分享受密码保护');
@@ -499,7 +572,7 @@ test('visitor unlocks a protected public share and sees the download action', as
 });
 
 test('visitor browses nested shared folders by double-clicking directories', async ({ page }) => {
-  const shareId='c'.repeat(32);
+  const shareId='cD4eF6g8';
   await page.route(`**/api/public/shares/${shareId}`,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({success:true,share:{
     id:shareId,name:'项目资料',type:'directory',locked:false,expiresAt:null,passwordProtected:false,
     files:[
@@ -507,7 +580,7 @@ test('visitor browses nested shared folders by double-clicking directories', asy
       {path:'一级/二级/报告.pdf',name:'报告.pdf',size:20,lastModified:'2026-08-30T00:00:00Z'},
     ],directories:['一级','一级/二级'],truncated:false,
   }})}));
-  await page.goto(`/share.html?id=${shareId}`);
+  await page.goto(`/s/${shareId}`);
   await expect(page.locator('.share-public-directory')).toHaveText(/一级/);
   await expect(page.locator('.share-public-files')).toContainText('根目录.txt');
   await expect(page.locator('.share-public-files')).not.toContainText('报告.pdf');
@@ -530,16 +603,44 @@ test('mobile file lists become complete cards without horizontal overflow', asyn
   await page.setViewportSize({ width:390, height:844 });
   await mockApi(page, true);
   await page.goto('/');
+  const mobileUpload = page.locator('#p-files .page-toolbar .mobile-upload');
+  await expect(mobileUpload).toBeVisible();
+  expect(await mobileUpload.evaluate(button => button.nextElementSibling?.dataset.action)).toBe('refresh');
+  const toolbarButtonSizes = await page.locator('#p-files .page-toolbar [data-action="nav-upload"], #p-files .page-toolbar [data-action="refresh"]').evaluateAll(buttons => buttons.map(button => {
+    const box = button.getBoundingClientRect();
+    return { width:Math.round(box.width), height:Math.round(box.height) };
+  }));
+  expect(toolbarButtonSizes[0]).toEqual(toolbarButtonSizes[1]);
+  const toolbarAlignment = await page.locator('#p-files .page-toolbar').evaluate(toolbar => {
+    const breadcrumb = toolbar.querySelector('.breadcrumb').getBoundingClientRect();
+    const upload = toolbar.querySelector('.mobile-upload').getBoundingClientRect();
+    return {
+      breadcrumbCenter:Math.round(breadcrumb.top + breadcrumb.height / 2),
+      uploadCenter:Math.round(upload.top + upload.height / 2),
+    };
+  });
+  expect(toolbarAlignment.breadcrumbCenter).toBe(toolbarAlignment.uploadCenter);
   const files = page.locator('#files-body');
-  await expect(files.locator('.file-type')).toBeVisible();
+  await expect(files.locator('.file-type')).toBeHidden();
+  await expect(files.locator('.file-size > .file-type')).toHaveCount(1);
+  await expect(files.locator('.file-name .file-type')).toHaveCount(0);
   await expect(files.locator('.file-size')).toBeVisible();
   await expect(files.locator('.file-date')).toBeVisible();
   await expect(files.locator('.file-actions')).toBeVisible();
+  for (const width of [320, 360, 390, 430]) {
+    await page.setViewportSize({ width, height:844 });
+    const nameCellWidth = await files.locator('.file-table tbody > tr td:nth-child(2)').first().evaluate(cell => Math.round(cell.getBoundingClientRect().width));
+    expect(nameCellWidth).toBeGreaterThanOrEqual(120);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  await page.setViewportSize({ width:390, height:844 });
+  const fileCardHeights = await files.locator('.file-table tbody > tr').evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)));
+  expect(Math.max(...fileCardHeights)).toBeLessThanOrEqual(82);
   const actionBoxes = await files.locator('.file-actions .btn').evaluateAll(buttons => buttons.map(button => {
     const box = button.getBoundingClientRect();
     return { width:Math.round(box.width), top:Math.round(box.top) };
   }));
-  expect(new Set(actionBoxes.map(box => box.width))).toEqual(new Set([50]));
+  expect(new Set(actionBoxes.map(box => box.width))).toEqual(new Set([38]));
   expect(new Set(actionBoxes.map(box => box.top)).size).toBe(1);
   const fileActionAlignment = await files.locator('.file-actions').evaluate(actions => {
     const container = actions.getBoundingClientRect();
@@ -561,12 +662,26 @@ test('mobile file lists become complete cards without horizontal overflow', asyn
   expect(mobileShell.tabPosition).toBe('relative');
   expect(mobileShell.tabsBottom).toBe(mobileShell.appBottom);
   expect(mobileShell.appBottom).toBe(mobileShell.viewportBottom);
-  await page.locator('#sidebar-toggle').click();
-  await page.locator('[data-page="recent"]').click();
+  await expect(page.locator('#sidebar-toggle')).toBeHidden();
+  await expect(page.locator('#nav-sidebar')).toBeHidden();
+  await expect(page.locator('.mobile-tabbar [data-action="nav-trash"]')).toHaveCount(0);
+  const mobileSettings = page.locator('.mobile-tabbar [data-action="nav-settings"]');
+  await expect(mobileSettings).toBeVisible();
+  await mobileSettings.click();
+  const mobileSettingsGroup = page.locator('#settings-body .settings-group.mobile-settings-nav');
+  await expect(mobileSettingsGroup).toBeVisible();
+  await mobileSettingsGroup.locator('[data-action="nav-dashboard"]').click();
+  await expect(page).toHaveURL(url => url.pathname === '/dashboard');
+  await mobileSettings.click();
+  await mobileSettingsGroup.locator('[data-action="nav-trash"]').click();
+  await expect(page).toHaveURL(url => url.pathname === '/trash');
+  await page.locator('.mobile-tabbar [data-action="nav-recent"]').click();
   const recent = page.locator('#recent-body');
   await expect(recent.locator('.file-size')).toBeVisible();
   await expect(recent.locator('.file-date')).toBeVisible();
   await expect(recent.locator('.file-actions')).toHaveCount(0);
+  const recentCardHeights = await recent.locator('.file-table tbody > tr').evaluateAll(rows => rows.map(row => Math.round(row.getBoundingClientRect().height)));
+  expect(Math.max(...recentCardHeights)).toBeLessThanOrEqual(68);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

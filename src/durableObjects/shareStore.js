@@ -27,7 +27,12 @@ export class ShareStore {
   async create(record) {
     const existing = await this.state.storage.list({ prefix:'share:' });
     if (existing.size >= 1000) return Response.json({ error:'Share limit reached' }, { status:409 });
-    await this.state.storage.put(`share:${record.id}`, record);
+    if (!validId(record.id)) return Response.json({ error:'Invalid share ID' }, { status:400 });
+    const key=`share:${record.id}`;
+    if (await this.state.storage.get(key)) {
+      return Response.json({ error:'Share ID collision',code:'SHARE_ID_COLLISION' }, { status:409 });
+    }
+    await this.state.storage.put(key, record);
     return Response.json({ share:publicRecord(record) });
   }
 
@@ -93,4 +98,4 @@ function publicRecord(record) {
 }
 
 function isExpired(share) { return Boolean(share.expiresAt && Date.parse(share.expiresAt)<=Date.now()); }
-function validId(id) { return /^[a-f0-9]{32}$/.test(id || ''); }
+function validId(id) { return /^(?:[A-Za-z0-9]{8}|[a-f0-9]{32})$/.test(id || ''); }

@@ -10,14 +10,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="format-detection" content="telephone=no">
-  <title>HF Drive · 私人云盘</title>
+  <title>HF Drive</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div class="login-overlay" id="login-overlay" style="display:none">
     <form class="login-card" id="login-form">
       <div class="login-mark" aria-hidden="true"><span>H</span></div>
-      <div class="login-brand"><span>HF Drive</span><i>私人云空间</i></div>
+      <div class="login-brand"><span>HF Drive</span></div>
       <h1>欢迎回来</h1><p>你的文件，始终安全地在身边。</p>
       <label for="login-password">访问密码</label>
       <div class="login-input-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 10V8a4.5 4.5 0 0 1 9 0v2M7 10h10a2 2 0 0 1 2 2v7H5v-7a2 2 0 0 1 2-2Z"/></svg><input class="form-input" id="login-password" type="password" placeholder="输入访问密码" autocomplete="current-password" required autofocus></div>
@@ -28,8 +28,7 @@
   </div>
   <div id="app">
     <aside class="nav-sidebar" id="nav-sidebar">
-      <div class="mac-window-controls" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="sidebar-brand"><div class="brand-symbol">H</div><div><strong>HF Drive</strong><span>私人云空间</span></div></div>
+      <div class="sidebar-brand"><div class="brand-symbol">H</div><div><strong>HF Drive</strong></div></div>
       <button class="sidebar-upload btn btn-primary" data-action="nav-upload"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>上传文件</span></button>
       <nav class="nav-menu" aria-label="主导航">
         <div class="nav-group"><div class="nav-group-title">资料库</div>
@@ -43,13 +42,25 @@
           <a class="nav-item" href="/settings" data-page="settings"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.6-1.4.9-1.9-2.1-2.1-1.9.9-1.4-.6-.7-2h-3l-.7 2-1.4.6-1.9-.9-2.1 2.1.9 1.9-.6 1.4-2 .7v3l2 .7.6 1.4-.9 1.9 2.1 2.1 1.9-.9 1.4.6.7 2h3l.7-2 1.4-.6 1.9.9 2.1-2.1-.9-1.9.6-1.4 2-.7Z"/></svg></span><span>设置</span></a>
         </div>
       </nav>
-      <div class="nav-footer"><div class="storage-mini"><div><span>云端存储</span><strong>Hugging Face Hub</strong></div><div class="storage-track"><i></i></div></div><div class="conn-status" id="conn-status"><span class="status-dot offline"></span><span>正在连接</span></div></div>
+      <div class="nav-footer"><div class="storage-mini"><div><span>云端存储</span><strong id="storage-percent">--</strong></div><div class="storage-summary"><span id="storage-usage">正在计算</span><span id="storage-plan">仓库容量</span></div><div class="storage-track" id="storage-track" role="progressbar" aria-label="存储空间使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="storage-fill"></i></div></div><div class="conn-status" id="conn-status"><span class="status-dot offline"></span><span>正在连接</span></div></div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <div class="workspace">
       <header class="top-bar"><div class="top-bar-left"><button class="sidebar-toggle" id="sidebar-toggle" aria-label="打开导航"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div class="mobile-brand"><span>H</span> HF Drive</div></div><div class="top-bar-center"><label class="search-bar" for="global-search"><svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" id="global-search" placeholder="搜索文件与文件夹" autocomplete="off"><kbd>⌘ K</kbd></label></div><div class="top-bar-right"><span class="workspace-pill"><i></i> 私人空间</span><button class="icon-button" type="button" aria-label="通知"><svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7M10 20h4"/></svg></button><span class="avatar">HF</span></div></header>
       <main class="content-area">
-        <section class="page active" id="p-files"><div class="page-heading"><div><p class="eyebrow">我的空间</p><h2>所有文件</h2><p class="page-description">随时查看、整理和分享你的云端内容</p></div><button class="btn btn-primary mobile-upload" data-action="nav-upload">＋ 上传</button></div><div class="page-toolbar"><div class="toolbar-left"><div class="breadcrumb" id="breadcrumb"></div></div><div class="toolbar-right"><div class="view-toggle"><button class="view-btn active" data-view="list" title="列表视图" aria-label="列表视图"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button><button class="view-btn" data-view="grid" title="网格视图" aria-label="网格视图"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button></div><button class="btn btn-sm btn-outline" data-action="refresh">刷新</button><button class="btn btn-sm btn-danger" id="batch-delete-btn" data-action="batch-delete" disabled>批量删除</button></div></div><div class="page-body" id="files-body"><div class="loading-state"><div class="spinner"></div><span>正在加载文件</span></div></div></section>
+        <section class="page active" id="p-files">
+          <div class="page-heading"><div><p class="eyebrow">我的空间</p><h2>所有文件</h2><p class="page-description">随时查看、整理和分享你的云端内容</p></div></div>
+          <div class="page-toolbar">
+            <div class="toolbar-left"><div class="breadcrumb" id="breadcrumb"></div></div>
+            <div class="toolbar-right">
+              <div class="view-toggle"><button class="view-btn active" data-view="list" title="列表视图" aria-label="列表视图"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></button><button class="view-btn" data-view="grid" title="网格视图" aria-label="网格视图"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></button></div>
+              <button class="btn btn-sm btn-primary mobile-upload" data-action="nav-upload">上传</button>
+              <button class="btn btn-sm btn-outline" data-action="refresh">刷新</button>
+              <button class="btn btn-sm btn-danger" id="batch-delete-btn" data-action="batch-delete" disabled>批量删除</button>
+            </div>
+          </div>
+          <div class="page-body" id="files-body"><div class="loading-state"><div class="spinner"></div><span>正在加载文件</span></div></div>
+        </section>
         <section class="page" id="p-recent"><div class="page-heading"><div><p class="eyebrow">动态</p><h2>最近上传</h2><p class="page-description">按时间浏览最近添加的文件</p></div></div><div class="page-body" id="recent-body"><div class="loading-state"><div class="spinner"></div></div></div></section>
         <section class="page" id="p-upload">
           <div class="page-heading"><div><p class="eyebrow">传输</p><h2>上传文件</h2><p class="page-description">选择文件，余下的交给 HF Drive</p></div></div>
@@ -61,7 +72,6 @@
                   <div class="upload-zone-glow"></div>
                   <div class="upload-zone-icon"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg></div>
                   <div class="upload-zone-text">拖放文件到这里</div>
-                  <div class="upload-zone-hint">或从 Mac、iPhone 与 iCloud Drive 中选择</div>
                   <button class="btn btn-primary upload-choose-button" type="button" tabindex="-1"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>选择文件</button>
                   <div class="upload-capabilities"><span>多文件</span><i></i><span>断点续传</span><i></i><span>大文件分片</span></div>
                   <input type="file" id="file-input" hidden multiple>
@@ -80,7 +90,7 @@
           </div>
         </section>
         <section class="page" id="p-trash"><div class="page-heading"><div><p class="eyebrow">资料库</p><h2>回收站</h2><p class="page-description">恢复误删项目，或将其永久移除</p></div><div class="toolbar-right"><button class="btn btn-sm btn-danger" id="empty-trash-btn" data-action="trash-empty" disabled>清空回收站</button></div></div><div class="page-body" id="trash-body"><div class="loading-state"><div class="spinner"></div></div></div></section>
-        <section class="page" id="p-shares"><div class="page-heading"><div><p class="eyebrow">协作</p><h2>我的分享</h2><p class="page-description">集中管理已创建的共享链接</p></div><button class="btn btn-sm btn-outline" data-action="refresh-shares">刷新</button></div><div class="page-body" id="shares-body"><div class="loading-state"><div class="spinner"></div></div></div></section>
+        <section class="page" id="p-shares"><div class="page-heading"><div><p class="eyebrow">协作</p><h2>我的分享</h2><p class="page-description">集中管理已创建的共享链接</p></div></div><div class="page-body" id="shares-body"><div class="loading-state"><div class="spinner"></div></div></div></section>
         <section class="page" id="p-dashboard"><div class="page-heading"><div><p class="eyebrow">空间</p><h2>空间概览</h2><p class="page-description">查看仓库容量、文件与连接状态</p></div></div><div class="page-body" id="dashboard-body"><div class="loading-state"><div class="spinner"></div></div></div></section>
         <section class="page" id="p-settings"><div class="page-heading"><div><p class="eyebrow">偏好设置</p><h2>设置</h2><p class="page-description">管理服务连接与当前会话</p></div></div><div class="page-body" id="settings-body"></div></section>
       </main>
@@ -89,7 +99,7 @@
       <button type="button" data-action="nav-files"><svg viewBox="0 0 24 24"><path d="M3.5 8.5h17v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-10Zm0 0V6a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v.5"/></svg><span>浏览</span></button>
       <button type="button" data-action="nav-recent"><svg viewBox="0 0 24 24"><path d="M12 7v5l3.5 2M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg><span>最近</span></button>
       <button type="button" data-action="nav-shares"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="m8.3 10.9 7.4-3.8m-7.4 6 7.4 3.8"/></svg><span>分享</span></button>
-      <button type="button" data-action="nav-trash"><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg><span>回收站</span></button>
+      <button type="button" data-action="nav-settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7-.6-1.4.9-1.9-2.1-2.1-1.9.9-1.4-.6-.7-2h-3l-.7 2-1.4.6-1.9-.9-2.1 2.1.9 1.9-.6 1.4-2 .7v3l2 .7.6 1.4-.9 1.9 2.1 2.1 1.9-.9 1.4.6.7 2h3l.7-2 1.4-.6 1.9.9 2.1-2.1-.9-1.9.6-1.4 2-.7Z"/></svg><span>设置</span></button>
     </nav>
   </div>
   <div class="context-menu" id="context-menu" style="display:none"></div>

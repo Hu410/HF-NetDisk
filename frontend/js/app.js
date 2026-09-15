@@ -107,11 +107,15 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
   let repoInfoRequest = null;
 
   function getRepoInfo({ force = false } = {}) {
-    if (!force && repoInfoCache && Date.now() - repoInfoCacheTime < REPO_INFO_CACHE_TTL) return Promise.resolve(repoInfoCache);
+    if (!force && repoInfoCache && Date.now() - repoInfoCacheTime < REPO_INFO_CACHE_TTL) {
+      updateStorageUsage(repoInfoCache);
+      return Promise.resolve(repoInfoCache);
+    }
     if (!force && repoInfoRequest) return repoInfoRequest;
     const request = API.getRepoInfo().then(result => {
       repoInfoCache = result;
       repoInfoCacheTime = Date.now();
+      updateStorageUsage(result);
       return result;
     }).finally(() => {
       if (repoInfoRequest === request) repoInfoRequest = null;
@@ -396,6 +400,7 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
       move: '<path d="M3.5 8.5h17v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-10Zm0 0V6a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v.5"/><path d="M9 14h6m0 0-2-2m2 2-2 2"/>',
       info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
       trash: '<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/>',
+      dashboard: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
       cloud: '<path d="M7.5 18.5h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.3-2A5 5 0 0 0 7.5 18.5Z"/>',
       lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
       wave: '<path d="M4 12h2.5l2-5 3 10 2.5-7 2 4h4"/>',
@@ -418,8 +423,8 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
 
     return `<tr class="${selected}" data-path="${U.esc(fp)}" data-type="${d ? 'directory' : 'file'}">
       <td><input type="checkbox" class="file-checkbox" data-action="select-file" data-path="${U.esc(fp)}" ${selected ? 'checked' : ''}></td>
-      <td><div class="file-name">${renderFileIcon(name, d)}${nameLink}<span class="file-type">${tp}</span></div></td>
-      <td class="file-size">${sz}</td>
+      <td><div class="file-name">${renderFileIcon(name, d)}${nameLink}</div></td>
+      <td class="file-size"><span class="file-type">${tp}</span><span>${sz}</span></td>
       <td class="file-date">${U.date(dt)}</td>
       <td><div class="file-actions">
         <button class="btn btn-ghost btn-sm text-action primary-text-action" title="分享" aria-label="分享" data-action="share-${d ? 'directory' : 'file'}-${U.esc(fp)}">${actionIcon('share')}<span class="action-label">分享</span></button>
@@ -1293,8 +1298,18 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
       <div class="settings-shell">
         <section class="settings-profile">
           <span class="settings-profile-icon">H</span>
-          <div><strong>HF Drive</strong><small>私人云空间</small></div>
+          <div><strong>HF Drive</strong></div>
           <span class="settings-status"><i></i>受保护</span>
+        </section>
+        <section class="settings-storage" aria-label="存储空间使用情况">
+          <div class="settings-storage-heading"><span>存储使用</span><strong id="mobile-storage-percent">--</strong></div>
+          <div class="settings-storage-summary"><span id="mobile-storage-usage">正在计算</span><span id="mobile-storage-plan">仓库容量</span></div>
+          <div class="storage-track" id="mobile-storage-track" role="progressbar" aria-label="存储空间使用率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="mobile-storage-fill"></i></div>
+        </section>
+        <p class="settings-section-label mobile-settings-nav">管理</p>
+        <section class="settings-group settings-actions mobile-settings-nav">
+          <button type="button" class="settings-action" data-action="nav-dashboard"><span class="settings-row-icon blue">${actionIcon('dashboard')}</span><span>空间概览</span><i>›</i></button>
+          <button type="button" class="settings-action" data-action="nav-trash"><span class="settings-row-icon red">${actionIcon('trash')}</span><span>回收站</span><i>›</i></button>
         </section>
         <p class="settings-section-label">连接</p>
         <section class="settings-group">
@@ -1309,6 +1324,7 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
         </section>
         <div class="settings-version">HF Drive · Web App</div>
       </div>`;
+    getRepoInfo().catch(() => {});
   }
 
   function showBatchDeleteConfirm() {
@@ -1384,6 +1400,36 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
   // ============================================================
   //  连接状态
   // ============================================================
+  function updateStorageUsage(result) {
+    const info = result?.info || result || {};
+    const usedBytes = Math.max(0, Number(info.size?.sizeInBytes || info.size?.size_in_bytes || 0));
+    const totalBytes = info.private ? 100 * 1024 ** 3 : 8 * 1024 ** 4;
+    const percentage = Math.min(100, usedBytes / totalBytes * 100);
+    const percentageLabel = usedBytes > 0 && percentage < 0.01 ? '<0.01%' : `${percentage.toFixed(2)}%`;
+    ['#storage-percent', '#mobile-storage-percent'].forEach(selector => {
+      const element = qs(selector);
+      if (element) element.textContent = percentageLabel;
+    });
+    ['#storage-usage', '#mobile-storage-usage'].forEach(selector => {
+      const element = qs(selector);
+      if (element) element.textContent = `${U.size(usedBytes)} / ${U.size(totalBytes)}`;
+    });
+    ['#storage-plan', '#mobile-storage-plan'].forEach(selector => {
+      const element = qs(selector);
+      if (element) element.textContent = info.private ? '私有仓库' : '公开仓库';
+    });
+    ['#storage-track', '#mobile-storage-track'].forEach(selector => {
+      const element = qs(selector);
+      if (!element) return;
+      element.setAttribute('aria-valuenow', percentage.toFixed(2));
+      element.setAttribute('aria-valuetext', percentageLabel);
+    });
+    ['#storage-fill', '#mobile-storage-fill'].forEach(selector => {
+      const element = qs(selector);
+      if (element) element.style.width = `${percentage}%`;
+    });
+  }
+
   function updateConnStatus(online) {
     const el = qs('#conn-status');
     if (!el) return;
@@ -1450,7 +1496,6 @@ import { createFrameScheduler } from './utils/frameScheduler.js';
 
     if (action.startsWith('share-file-')) { e.stopPropagation(); showShareModal(action.slice(11),'file'); return; }
     if (action.startsWith('share-directory-')) { e.stopPropagation(); showShareModal(action.slice(16),'directory'); return; }
-    if (action === 'refresh-shares') { loadShares(sharePage,{ force:true }); return; }
     if (action === 'shares-prev') { loadShares(Math.max(1,sharePage-1)); return; }
     if (action === 'shares-next') { loadShares(sharePage+1); return; }
     if (action === 'copy-created-share') { copyText(qs('#created-share-url').value).catch(error=>Toast.error('复制失败',error.message)); return; }

@@ -14,7 +14,8 @@ const server = createServer(async (request, response) => {
   let pathname = '/';
   try {
     pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
-    const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    const isPublicShare = /^\/s\/(?:[A-Za-z0-9]{8}|[a-f0-9]{32})\/?$/.test(pathname);
+    const relative = pathname === '/' ? 'index.html' : isPublicShare ? 'share.html' : pathname.replace(/^\/+/, '');
     const file = resolve(join(root, normalize(relative)));
     if (file !== root && !file.startsWith(`${root}\\`) && !file.startsWith(`${root}/`)) throw new Error('Invalid path');
     const info = await stat(file);

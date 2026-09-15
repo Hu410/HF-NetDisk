@@ -182,14 +182,14 @@ paths:
       summary: Revoke a share immediately
       security: [{ sessionCookie: [] }]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-f0-9]{32}$' } }
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(?:[A-Za-z0-9]{8}|[a-f0-9]{32})$' } }
       responses:
         '200': { description: Share revoked }
   /api/public/shares/{id}:
     get:
       summary: Read public share metadata or its locked state
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^(?:[A-Za-z0-9]{8}|[a-f0-9]{32})$' } }
       responses:
         '200': { description: Public share metadata }
         '410': { description: Share expired }

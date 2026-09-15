@@ -12,6 +12,7 @@ export { UploadSession } from './durableObjects/uploadSession.js';
 export { ShareStore } from './durableObjects/shareStore.js';
 
 const FRONTEND_ROUTES = new Set(['/', '/files', '/recent', '/shares', '/trash', '/dashboard', '/settings', '/upload']);
+const PUBLIC_SHARE_ROUTE = /^\/s\/(?:[A-Za-z0-9]{8}|[a-f0-9]{32})\/?$/;
 
 function logError(requestId, request, error) {
   const url = new URL(request.url);
@@ -68,6 +69,12 @@ async function router(context) {
   if (pathname.startsWith('/api/meta/')) return metadataHandler(context);
   if (pathname === '/api') {
     return jsonResponse({ name: 'Cloudflare HF Netdisk', version: '1.0.0', documentation: '/openapi.yaml', authentication: 'HttpOnly session cookie' });
+  }
+  if (PUBLIC_SHARE_ROUTE.test(url.pathname) && ['GET', 'HEAD'].includes(request.method) && context.env.ASSETS?.fetch) {
+    // Cloudflare Assets canonicalizes /share.html to /share with a redirect.
+    // Request the canonical asset path internally so the browser keeps /s/{id}.
+    const shareUrl = new URL('/share', url);
+    return context.env.ASSETS.fetch(new Request(shareUrl, request));
   }
   if (FRONTEND_ROUTES.has(pathname) && ['GET', 'HEAD'].includes(request.method) && context.env.ASSETS?.fetch) {
     const indexUrl = new URL('/', url);

@@ -1,7 +1,8 @@
 import { escapeHtml as esc, formatBytes as size } from './utils/format.js';
 
 const content=document.querySelector('#share-content');
-const id=new URLSearchParams(location.search).get('id')||'';
+const pathId=location.pathname.match(/^\/s\/([A-Za-z0-9]{8}|[a-f0-9]{32})\/?$/)?.[1];
+const id=pathId||new URLSearchParams(location.search).get('id')||'';
 let folderShare=null;
 let currentDirectory='';
 
@@ -15,7 +16,7 @@ async function request(path,options={}){
 }
 
 async function load(){
-  if(!/^[a-f0-9]{32}$/.test(id)){ renderError('分享链接无效','请检查链接是否完整。'); return; }
+  if(!/^(?:[A-Za-z0-9]{8}|[a-f0-9]{32})$/.test(id)){ renderError('分享链接无效','请检查链接是否完整。'); return; }
   try{
     const { share }=await request(`/api/public/shares/${id}`);
     if(share.locked) renderUnlock(share);

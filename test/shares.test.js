@@ -27,6 +27,19 @@ function managed(url,env,method='GET',body){
 afterEach(()=>vi.restoreAllMocks());
 
 describe('shares',()=>{
+  it('rejects an ID collision without replacing the existing share',async()=>{
+    const store=new ShareStore({ storage:new MemoryStorage() });
+    const id='aB3dE5g7';
+    const first={ id,path:'first.txt',name:'first.txt',type:'file',createdAt:'2026-09-01T00:00:00Z',expiresAt:null };
+    const second={ ...first,path:'second.txt',name:'second.txt' };
+    expect((await store.fetch(new Request('https://shares/share/create',{method:'POST',body:JSON.stringify(first)}))).status).toBe(200);
+    const collision=await store.fetch(new Request('https://shares/share/create',{method:'POST',body:JSON.stringify(second)}));
+    expect(collision.status).toBe(409);
+    expect((await collision.json()).code).toBe('SHARE_ID_COLLISION');
+    const stored=await store.fetch(new Request('https://shares/share/get',{method:'POST',body:JSON.stringify({id})}));
+    expect((await stored.json()).share.path).toBe('first.txt');
+  });
+
   it('creates a password-protected share without exposing password material and unlocks it',async()=>{
     const env=environment();
     vi.spyOn(HuggingFaceAPI.prototype,'listDirectory').mockResolvedValue({
@@ -40,6 +53,8 @@ describe('shares',()=>{
     expect(JSON.stringify(createdBody)).not.toContain('passwordHash');
     expect(JSON.stringify(createdBody)).not.toContain('secret');
     const id=createdBody.share.id;
+    expect(id).toMatch(/^[A-Za-z0-9]{8}$/);
+    expect(createdBody.share.url).toBe(`https://disk.test/s/${id}`);
 
     const locked=await sharesHandler({request:new Request(`https://disk.test/api/public/shares/${id}`),env});
     expect((await locked.json()).share.locked).toBe(true);
@@ -77,7 +92,7 @@ describe('shares',()=>{
   });
 
   it('loads a public folder share with the server-recursive paged tree',async()=>{
-    const env=environment(),id='c'.repeat(32);
+    const env=environment(),id='cD4eF6g8';
     await env.SHARES.get().fetch('https://shares/share/create',{method:'POST',body:JSON.stringify({
       id,path:'shared',name:'shared',type:'directory',createdAt:'2026-09-01T00:00:00Z',expiresAt:null,passwordHash:null,passwordSalt:null,
     })});
@@ -106,7 +121,7 @@ describe('shares',()=>{
     const env=environment();
     for(let index=0;index<25;index++){
       await env.SHARES.get().fetch('https://shares/share/create',{method:'POST',body:JSON.stringify({
-        id:index.toString(16).padStart(32,'0'),path:`file-${index}.txt`,name:`file-${index}.txt`,type:'file',
+        id:index.toString(36).padStart(8,'0'),path:`file-${index}.txt`,name:`file-${index}.txt`,type:'file',
         createdAt:new Date(Date.UTC(2026,0,index+1)).toISOString(),expiresAt:null,passwordHash:null,passwordSalt:null,
       })});
     }

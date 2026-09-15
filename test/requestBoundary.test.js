@@ -20,6 +20,22 @@ describe('request boundary', () => {
     expect(requestedPaths).toEqual(['/']);
   });
 
+  it('serves the public share shell for an eight-character share route', async () => {
+    const requestedPaths = [];
+    const env = {
+      ASSETS: {
+        fetch: async request => {
+          requestedPaths.push(new URL(request.url).pathname);
+          return new Response('<!doctype html><title>Shared file</title>', { headers: { 'Content-Type':'text/html' } });
+        },
+      },
+    };
+    const response = await worker.fetch(new Request('https://disk.example/s/aB3dE5g7'), env);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('Shared file');
+    expect(requestedPaths).toEqual(['/share']);
+  });
+
   it('reports binding readiness without exposing configuration values', async () => {
     const env = { SESSIONS: {}, UPLOADS: {}, SHARES: {}, HF_REPO: 'owner/repo', HF_TOKEN: 'secret', APP_PASSWORD: 'secret' };
     const response = await worker.fetch(new Request('https://disk.example/api/health'), env);
